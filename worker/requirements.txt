@@ -1,0 +1,2 @@
+# Standard-library RSS/HTTP/HTML/GitHub REST worker has no pip dependencies.
+# Browser enhancement uses requirements.scrapling.txt only when explicitly enabled.

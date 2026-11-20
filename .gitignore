@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.coverage
+.pytest_cache/
+bin/
+logs/
+results/
+artifacts/
+*.sqlite
+.DS_Store
+data/private/
+data/source_registry_77*.json
+*.zip

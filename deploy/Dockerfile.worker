@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_NO_CACHE_DIR=1
+ARG INSTALL_BROWSER=false
+ARG INSTALL_SCRAPLING=false
+WORKDIR /srv/worker
+COPY worker/requirements.txt worker/requirements.scrapling.txt ./
+RUN if [ "$INSTALL_SCRAPLING" = "true" ] || [ "$INSTALL_BROWSER" = "true" ]; then \
+      pip install --no-cache-dir -r requirements.scrapling.txt; \
+    fi \
+ && if [ "$INSTALL_BROWSER" = "true" ]; then playwright install --with-deps chromium; fi
+COPY worker/aivoya_worker ./aivoya_worker
+RUN useradd -r -u 10001 worker
+USER 10001
+CMD ["python","-m","aivoya_worker.main"]

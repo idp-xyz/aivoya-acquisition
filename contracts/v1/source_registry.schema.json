@@ -1,0 +1,23 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://aivoya.com/contracts/v1/source_registry.schema.json",
+  "title":"AIVOYA Source Registry Import V1.0",
+  "type":"object",
+  "required":["sources"],
+  "properties":{"sources":{"type":"array","maxItems":500,"items":{
+    "type":"object",
+    "required":["source_id","name","origin_url","access_mode"],
+    "properties":{
+      "source_id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,94}$"},
+      "name":{"type":"string","minLength":1},"origin_url":{"type":"string","format":"uri"},
+      "endpoint_url":{"type":"string","format":"uri"},
+      "region":{"type":"string"},"language":{"type":"string"},"category":{"type":"string"},"source_mode":{"type":"string"},
+      "access_mode":{"enum":["rss","html_index","monitor","html_static","browser_render","github_releases","api","manual"]},
+      "rights":{"enum":["metadata_only","extract_only","full_text_licensed","prohibited"]},
+      "review_status":{"enum":["pending","approved","denied"]},
+      "policy_version":{"type":"integer"},"enabled":{"type":"boolean"},"interval_minutes":{"type":"integer","minimum":5,"maximum":10080},
+      "onboarding_batch":{"type":"string"},"endpoint_verification":{"type":"string"},"endpoint_hint":{"type":"string"},"ingestion_notes":{"type":"string"}
+    },
+    "additionalProperties":false
+  }}},"additionalProperties":false
+}

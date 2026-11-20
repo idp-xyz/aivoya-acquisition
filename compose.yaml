@@ -1,0 +1,63 @@
+name: aivoya-acquisition
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aivoya
+      POSTGRES_USER: aivoya
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aivoya -d aivoya"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [private]
+  api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://aivoya:${POSTGRES_PASSWORD}@postgres:5432/aivoya?sslmode=disable
+      AIVOYA_ADMIN_TOKEN: ${AIVOYA_ADMIN_TOKEN:?Set admin token}
+      AIVOYA_WORKER_TOKEN: ${AIVOYA_WORKER_TOKEN:?Set worker token}
+      ADDR: ':8080'
+    ports:
+      - '127.0.0.1:8080:8080'
+    networks: [private,public]
+    security_opt: [no-new-privileges:true]
+  worker:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.worker
+      args:
+        INSTALL_BROWSER: ${INSTALL_BROWSER:-false}
+        INSTALL_SCRAPLING: ${INSTALL_SCRAPLING:-false}
+    restart: unless-stopped
+    depends_on: [api]
+    environment:
+      AIVOYA_API_URL: http://api:8080
+      AIVOYA_WORKER_TOKEN: ${AIVOYA_WORKER_TOKEN:?Set worker token}
+      AIVOYA_FETCH_ENGINE: ${AIVOYA_FETCH_ENGINE:-stdlib}
+      AIVOYA_ENV: ${AIVOYA_ENV:-development}
+      AIVOYA_EGRESS_GUARD_VERIFIED: ${AIVOYA_EGRESS_GUARD_VERIFIED:-false}
+      AIVOYA_GITHUB_TOKEN: ${AIVOYA_GITHUB_TOKEN:-}
+      AIVOYA_USER_AGENT: ${AIVOYA_USER_AGENT:-AIVOYA-Acquisition/1.0}
+    networks: [private,public]
+    security_opt: [no-new-privileges:true]
+    # Browser-enabled workers need an OS-level allowlisted egress proxy before production.
+    mem_limit: 2g
+    cpus: 2.0
+volumes:
+  pgdata:
+networks:
+  private:
+    internal: true
+  public:
+    driver: bridge

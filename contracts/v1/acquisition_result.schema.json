@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aivoya.com/contracts/v1/acquisition_result.schema.json",
+  "title": "AIVOYA Acquisition Result V1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "job_id", "lease_token", "status", "acquired_at"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "job_id": {"type":"string"},
+    "lease_token": {"type":"string"},
+    "status": {"enum":["success", "retryable_error", "permanent_error", "blocked"]},
+    "error_code": {"type":"string"},
+    "error": {"type":"string"},
+    "method_used": {"type":"string"},
+    "http_status": {"type":"integer", "minimum":0, "maximum":599},
+    "final_url": {"type":"string"},
+    "acquired_at": {"type":"string", "format":"date-time"},
+    "raw_base64": {"type":"string", "contentEncoding":"base64"},
+    "media_type": {"type":"string"},
+    "title": {"type":"string"},
+    "body_text": {"type":"string"},
+    "language": {"type":"string"},
+    "published_at": {"type":["string", "null"], "format":"date-time"},
+    "extractor_name": {"type":"string"},
+    "extractor_version": {"type":"string"},
+    "entries": {"type":"array", "maxItems":40, "items":{"type":"object", "required":["url","title"], "properties":{"url":{"type":"string"},"title":{"type":"string"},"published_at":{"type":["string","null"]}},"additionalProperties":false}},
+    "duration_ms": {"type":"integer", "minimum":0},
+    "retry_after_seconds": {"type":"integer", "minimum":0, "maximum":3600}
+  },
+  "allOf": [{"if":{"properties":{"status":{"const":"success"}}},"then":{"required":["http_status","final_url","raw_base64","media_type","extractor_name","extractor_version"]}}]
+}

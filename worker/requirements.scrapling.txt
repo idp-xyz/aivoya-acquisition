@@ -1,0 +1,3 @@
+# Explicit opt-in dependency; do not install browser/runtime by default.
+# Pin candidate version. Production requires a reproducible lock+hash audit.
+scrapling[fetchers,rag]==0.5.1

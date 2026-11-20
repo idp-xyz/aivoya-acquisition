@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aivoya.com/contracts/v1/acquisition_job.schema.json",
+  "title": "AIVOYA Acquisition Job Lease V1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "job_id", "source_id", "url", "method", "rights", "policy_version", "lease_token", "attempt", "deadline_ms"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "job_id": {"type":"string", "minLength": 5},
+    "source_id": {"type":"string", "minLength": 2},
+    "url": {"type":"string", "format":"uri", "pattern":"^https?://"},
+    "origin_url": {"type":"string", "format":"uri", "pattern":"^https?://"},
+    "method": {"enum":["rss", "html_index", "monitor", "html_static", "browser_render", "github_releases", "api"]},
+    "rights": {"enum":["metadata_only", "extract_only", "full_text_licensed"]},
+    "policy_version": {"type":"integer", "minimum":1},
+    "lease_token": {"type":"string", "minLength":10},
+    "attempt": {"type":"integer", "minimum":1},
+    "deadline_ms": {"type":"integer", "minimum":1000, "maximum":90000}
+  }
+}

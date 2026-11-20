@@ -1,0 +1,162 @@
+name: Acquisition Fabric - Verified Acceptance
+on:
+  workflow_dispatch:
+    inputs:
+      online_github:
+        description: "Execute public GitHub Releases official API smoke test (no fulltext)"
+        required: true
+        type: boolean
+        default: true
+      online_scrapling:
+        description: "Execute one public example.com static HTTP smoke request"
+        required: true
+        type: boolean
+        default: true
+      browser_fixture:
+        description: "Install Chromium, verify JavaScript render against LOCAL fixture only"
+        required: true
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: acquisition-acceptance-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  postgres16-integration:
+    name: Go + PostgreSQL 16 Integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aivoya_test
+          POSTGRES_USER: aivoya
+          POSTGRES_PASSWORD: ci-integration-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U aivoya -d aivoya_test"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      TEST_DATABASE_URL: postgres://aivoya:ci-integration-only@127.0.0.1:5432/aivoya_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Materialize Go dependency checksums
+        run: go mod tidy && go mod verify
+      - name: Record resolved dependency versions
+        run: |
+          git diff -- go.mod || true
+          printf "Dependency resolution is pending lockfile review; CI records go.mod and go.sum for reproducible follow-up.\n"
+      - name: Go unit + real database integration
+        run: |
+          set -o pipefail
+          go test -count=1 -timeout=10m -v ./... 2>&1 | tee go-tests.log
+      - name: Go vet
+        run: go vet ./...
+      - name: Capture reproducible lock file for commit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-acceptance-evidence
+          path: |
+            go.mod
+            go.sum
+            go-tests.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  python-offline:
+    name: Python Worker + Registry + Schemas
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Run deterministic unit tests
+        run: PYTHONPATH=worker python -m unittest discover -s worker/tests -v
+      - name: Check syntax
+        run: python -m compileall -q worker tools
+      - name: Validate public example registry
+        run: go run ./cmd/validate-registry -input data/source_registry.sample.json
+      - name: Verify source file manifest
+        run: python tools/verify_manifest.py
+
+  official-github-api:
+    name: Official public metadata API - live
+    if: github.event_name == 'workflow_dispatch' && inputs.online_github
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run real GitHub connector and policy
+        run: python tools/cloud_smoke.py --stage github-api --out artifacts/github-api.json
+        env:
+          AIVOYA_USER_AGENT: AIVOYA-Acquisition-CI/1.1 (public-metadata-only)
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-live-evidence
+          path: artifacts/github-api.json
+          if-no-files-found: warn
+
+  scrapling-static:
+    name: Scrapling 0.5.1 - public static HTML smoke
+    if: github.event_name == 'workflow_dispatch' && inputs.online_scrapling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Scrapling optional dependencies
+        run: pip install "scrapling[fetchers]==0.5.1"
+      - name: Smoke one public static HTML page
+        run: python tools/cloud_smoke.py --stage scrapling-http --out artifacts/scrapling-http.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrapling-static-evidence
+          path: artifacts/scrapling-http.json
+          if-no-files-found: warn
+
+  scrapling-browser:
+    name: Scrapling 0.5.1 - local JavaScript fixture
+    if: github.event_name == 'workflow_dispatch' && inputs.browser_fixture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Scrapling and browser
+        run: |
+          pip install "scrapling[fetchers]==0.5.1"
+          python -m playwright install --with-deps chromium
+      - name: Render and extract local fixture
+        run: python tools/cloud_smoke.py --stage scrapling-browser --out artifacts/scrapling-browser.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrapling-browser-evidence
+          path: artifacts/scrapling-browser.json
+          if-no-files-found: warn
