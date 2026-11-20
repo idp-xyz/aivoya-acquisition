@@ -323,7 +323,7 @@ func (s *Store) Claim(ctx context.Context) (*core.Claim, error) {
 	if e != nil {
 		return nil, e
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO job_events(job_id,event_type,details) VALUES($1,'leased',jsonb_build_object('attempt',$2))`, j.JobID, j.Attempt)
+	_, e = tx.Exec(ctx, `INSERT INTO job_events(job_id,event_type,details) VALUES($1,'leased',jsonb_build_object('attempt',$2::integer))`, j.JobID, j.Attempt)
 	if e != nil {
 		return nil, e
 	}
