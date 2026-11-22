@@ -136,6 +136,7 @@ func (s Server) Routes() http.Handler {
 		respond(w, map[string]any{"status": status, "job_id": req.JobID}, e)
 	})))
 	mux.HandleFunc("GET /console", serveConsole)
+	mux.HandleFunc("GET /pulse", servePulse)
 	return requestLog(mux, s.Logger)
 }
 func pageLimit(r *http.Request) int {
@@ -225,13 +226,28 @@ func requestLog(next http.Handler, logger *slog.Logger) http.Handler {
 }
 func (s Server) String() string { return fmt.Sprintf("acquisition-api") }
 
-//go:embed console.html
+//go:embed console.html pulse.html
 var consoleHTML embed.FS
 
 func serveConsole(w http.ResponseWriter, r *http.Request) {
 	content, e := consoleHTML.ReadFile("console.html")
 	if e != nil {
 		http.Error(w, "console unavailable", 500)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(content)
+}
+
+// servePulse exposes the responsive source-level motion dashboard. All operational
+// API calls remain protected by the same Bearer-token authentication middleware.
+func servePulse(w http.ResponseWriter, r *http.Request) {
+	content, err := consoleHTML.ReadFile("pulse.html")
+	if err != nil {
+		http.Error(w, "pulse dashboard unavailable", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
