@@ -72,7 +72,7 @@ TEST_DATABASE_URL='postgres://aivoya:...@127.0.0.1:5432/aivoya_test?sslmode=disa
   go test -count=1 ./internal/store -run Integration -v
 ```
 
-CI 模板已提供 `.github/workflows/verification.yml`，配置 PostgreSQL 16 服务以自动执行完整集成测试。`go.sum` 因本地 Go module proxy DNS 不通而未能生成，必须在联网环境生成并提交，才能符合生产依赖锁要求。
+CI 模板已提供 `.github/workflows/verification.yml`，配置 PostgreSQL 16 服务以自动执行完整集成测试。`go.sum` 已在本地 Go 1.23.12 容器里用 `go mod tidy` 生成并纳入版本库（`go` 指令仍是 `1.23.0`，没有 `toolchain` 行）。`postgres16-integration` 工作流改为先执行 `go mod tidy -diff` 和 `go mod verify`，锁文件与源码不一致就失败，不再在 CI 里重新解析依赖。本地还对一个专用的空 PostgreSQL 16.15 数据库执行了 `go mod verify`、`go build ./...`、`go vet ./...` 和 `go test -count=1 -v ./...`；`TestIntegrationLifecycle`、`TestIntegrationV11PolicyRotationAndGitHub`、`TestIntegrationV11RetryAfterDomainCooldown` 都实际跑过，没有被跳过。GitHub Actions 上的任务、真实站点采集和 Docker Compose 预演都还没有做。
 
 ## 浏览器采集与合规边界
 
