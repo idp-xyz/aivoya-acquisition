@@ -76,6 +76,6 @@ CI 模板已提供 `.github/workflows/verification.yml`，配置 PostgreSQL 16 �
 
 ## 浏览器采集与合规边界
 
-默认 Worker 完全不需要 `pip` 安装第三方抓取库。只有在完成外部安全出站策略、来源许可核验、机器人规则检查和目标站点 PoC 后才考虑 `INSTALL_SCRAPLING=true`，动态浏览器另需 `INSTALL_BROWSER=true`。请注意：`AIVOYA_EGRESS_GUARD_VERIFIED=true` 是人工标志，**不能替代网络防火墙、DNS pinning 或安全代理**。
+默认 Worker 完全不需要 `pip` 安装第三方抓取库。只有在完成外部安全出站策略、来源许可核验、机器人规则检查和目标站点 PoC 后才考虑 `INSTALL_SCRAPLING=true`，动态浏览器另需 `INSTALL_BROWSER=true`。请注意：`AIVOYA_EGRESS_GUARD_VERIFIED=true` 是人工标志，**不能替代网络防火墙、DNS pinning 或安全代理**。标准库抓取只连接该跳已校验通过的地址，并忽略环境变量里的 `HTTP_PROXY`/`HTTPS_PROXY`。显式设置的 `AIVOYA_EGRESS_PROXY`（仅无凭证的 `http://host:port`）是唯一代理，目的地址强制交给该代理；Scrapling 与浏览器路径仍未钉死。
 
 架构 ADR 见 [ENGINEERING_DECISIONS](docs/ENGINEERING_DECISIONS.md)，安全边界见 [SECURITY](docs/SECURITY.md)，验收计划见 [CLOUD_VERIFICATION](docs/CLOUD_VERIFICATION.md)。

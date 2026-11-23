@@ -22,6 +22,6 @@ The actual 77-source registry is excluded from this public distribution; import 
 ## Verification
 
 After the push, open `https://github.com/idpxyz/aivoya-acquisition/actions`.
-The PostgreSQL 16 integration and Python tests run on push. Note that `go.sum` is currently not committed; the workflow captures dependency resolution output, which should be reviewed and committed before production acceptance. Live GitHub API and Scrapling tests
+The PostgreSQL 16 integration and Python tests run on push. `go.sum` is committed with `go.mod`. The workflow checks that lock with `go mod tidy -diff` and `go mod verify` before the Go tests, and uploads the committed `go.mod`, `go.sum`, and `go-tests.log`; it does not capture a newly resolved lock to commit later. Live GitHub API and Scrapling tests
 are separately gated behind `workflow_dispatch`, and should be run only after approval.
 No private credentials may be committed or attached to CI artifacts.
