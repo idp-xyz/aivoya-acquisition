@@ -752,9 +752,15 @@ func (s *Store) PolicyEvents(ctx context.Context, id string) ([]map[string]any, 
 	return out, rows.Err()
 }
 
-// UpdateConfig deliberately resets approval on transport or endpoint change.
+// UpdateConfig deliberately resets approval on transport, endpoint, or origin change.
 // It also deletes previously stored source content until a fresh rights review.
-func (s *Store) UpdateConfig(ctx context.Context, id, endpoint, mode string, interval int, reviewer, basis string) error {
+// An empty origin keeps the registered publisher host.
+func (s *Store) UpdateConfig(ctx context.Context, id, origin, endpoint, mode string, interval int, reviewer, basis string) error {
+	if origin != "" {
+		if err := core.ValidatePublicURL(origin); err != nil {
+			return fmt.Errorf("origin: %w", err)
+		}
+	}
 	if err := core.ValidatePublicURL(endpoint); err != nil {
 		return err
 	}
@@ -779,7 +785,7 @@ func (s *Store) UpdateConfig(ctx context.Context, id, endpoint, mode string, int
 		return e
 	}
 	defer tx.Rollback(ctx)
-	tag, e := tx.Exec(ctx, `UPDATE sources SET endpoint_url=$2,access_mode=$3,interval_minutes=$4,rights='metadata_only',review_status='pending',enabled=false,policy_version=policy_version+1,updated_at=now() WHERE source_id=$1`, id, endpoint, mode, interval)
+	tag, e := tx.Exec(ctx, `UPDATE sources SET origin_url=CASE WHEN $2='' THEN origin_url ELSE $2 END,endpoint_url=$3,access_mode=$4,interval_minutes=$5,rights='metadata_only',review_status='pending',enabled=false,policy_version=policy_version+1,updated_at=now() WHERE source_id=$1`, id, origin, endpoint, mode, interval)
 	if e != nil {
 		return e
 	}

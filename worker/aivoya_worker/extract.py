@@ -5,6 +5,7 @@ from html import unescape
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
+from xml.parsers import expat
 from urllib.parse import urljoin,urlsplit
 from .policy import normalize_url, same_origin_host
 import re
@@ -108,9 +109,28 @@ def parse_date(value:str|None)->str|None:
     if obj.tzinfo is None:obj=obj.replace(tzinfo=timezone.utc)
     return obj.astimezone(timezone.utc).isoformat().replace('+00:00','Z')
 
+def parse_feed_xml(payload:bytes)->ET.Element:
+    """Reject a real XML doctype or entity declaration.
+
+    A byte search flags HTML inside CDATA, which legitimate feeds embed.
+    Expat reports the actual declarations and leaves text content alone.
+    """
+    checker=expat.ParserCreate()
+    def _forbid(*_args,**_kwargs):
+        raise ValueError('XML DTD is forbidden')
+    checker.StartDoctypeDeclHandler=_forbid
+    checker.EntityDeclHandler=_forbid
+    checker.UnparsedEntityDeclHandler=_forbid
+    checker.NotationDeclHandler=_forbid
+    checker.ExternalEntityRefHandler=_forbid
+    try:
+        checker.Parse(payload,True)
+    except expat.ExpatError as exc:
+        raise ValueError(f'Malformed XML: {exc}') from exc
+    return ET.fromstring(payload)
+
 def feed_entries(payload:bytes,base_url:str,*,max_entries=40,origin_url='')->list[dict]:
-    if b'<!DOCTYPE' in payload.upper() or b'<!ENTITY' in payload.upper():raise ValueError('XML DTD is forbidden')
-    root=ET.fromstring(payload)
+    root=parse_feed_xml(payload)
     result=[];seen=set()
     for item in list(root.iter()):
         tag=item.tag.rsplit('}',1)[-1].lower()

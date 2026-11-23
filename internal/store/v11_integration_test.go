@@ -95,6 +95,44 @@ func TestIntegrationV11PolicyRotationAndGitHub(t *testing.T) {
 	}
 }
 
+func TestIntegrationUpdateOriginResetsApproval(t *testing.T) {
+	s, ctx := integrationDB(t)
+	id := "it-origin-" + core.ID("")[:16]
+	endpoint := "https://rss.example.org/rss/cs"
+	_, err := s.Register(ctx, []core.Source{{ID: id, Name: "Origin correction test", OriginURL: "https://info.example.org/help", EndpointURL: endpoint, AccessMode: "rss", Rights: "metadata_only", IntervalMinutes: 60}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.Approve(ctx, id, "metadata_only", true, "test-reviewer", "initial authorization basis"); err != nil {
+		t.Fatal(err)
+	}
+	corrected := "https://example.org/list/cs/recent"
+	if err = s.UpdateConfig(ctx, id, corrected, endpoint, "rss", 60, "test-reviewer", "article links live on the publisher host"); err != nil {
+		t.Fatal(err)
+	}
+	var origin, status string
+	var enabled bool
+	if err = s.DB.QueryRow(ctx, `SELECT origin_url,review_status,enabled FROM sources WHERE source_id=$1`, id).Scan(&origin, &status, &enabled); err != nil {
+		t.Fatal(err)
+	}
+	if origin != corrected || status != "pending" || enabled {
+		t.Fatalf("origin update did not reset approval: %s %s %v", origin, status, enabled)
+	}
+	if err = s.Approve(ctx, id, "metadata_only", true, "test-reviewer", "renewed authorization basis"); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.UpdateConfig(ctx, id, "", endpoint, "rss", 90, "test-reviewer", "interval only, keep the publisher host"); err != nil {
+		t.Fatal(err)
+	}
+	var interval int
+	if err = s.DB.QueryRow(ctx, `SELECT origin_url,interval_minutes,review_status FROM sources WHERE source_id=$1`, id).Scan(&origin, &interval, &status); err != nil {
+		t.Fatal(err)
+	}
+	if origin != corrected || interval != 90 || status != "pending" {
+		t.Fatalf("empty origin changed the publisher host: %s %d %s", origin, interval, status)
+	}
+}
+
 func TestIntegrationV11RetryAfterDomainCooldown(t *testing.T) {
 	s, ctx := integrationDB(t)
 	id := "it-cooldown-" + core.ID("")[:16]

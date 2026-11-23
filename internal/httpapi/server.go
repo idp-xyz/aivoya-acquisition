@@ -55,6 +55,7 @@ func (s Server) Routes() http.Handler {
 	})))
 	mux.Handle("POST /v1/sources/{id}/configure", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
+			OriginURL       string `json:"origin_url"`
 			EndpointURL     string `json:"endpoint_url"`
 			AccessMode      string `json:"access_mode"`
 			IntervalMinutes int    `json:"interval_minutes"`
@@ -64,7 +65,7 @@ func (s Server) Routes() http.Handler {
 		if !decode(w, r, &req) {
 			return
 		}
-		e := s.Store.UpdateConfig(r.Context(), r.PathValue("id"), req.EndpointURL, req.AccessMode, req.IntervalMinutes, req.Reviewer, req.Basis)
+		e := s.Store.UpdateConfig(r.Context(), r.PathValue("id"), req.OriginURL, req.EndpointURL, req.AccessMode, req.IntervalMinutes, req.Reviewer, req.Basis)
 		respond(w, map[string]any{"status": "pending_review", "source_id": r.PathValue("id")}, e)
 	})))
 	mux.Handle("POST /v1/sources/{id}/approve", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -202,7 +203,7 @@ func fail(w http.ResponseWriter, e error) {
 }
 func isInvalid(e error) bool {
 	t := e.Error()
-	for _, v := range []string{"invalid", "not approved", "requires dedicated", "active job exists", "unknown completion", "missing", "mismatch", "non-2xx", "raw snapshot", "redirect changed", "unsupported schema", "private", "non-standard", "URL must", "bulk limit", "quality", "reviewer and basis"} {
+	for _, v := range []string{"invalid", "not approved", "requires dedicated", "active job exists", "unknown completion", "missing", "mismatch", "non-2xx", "raw snapshot", "redirect changed", "unsupported schema", "private", "not allowed", "non-standard", "URL must", "bulk limit", "quality", "reviewer and basis"} {
 		if strings.Contains(t, v) {
 			return true
 		}
