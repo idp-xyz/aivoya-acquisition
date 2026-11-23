@@ -4,9 +4,10 @@ import importlib.util
 import logging
 import os
 import time
-from urllib.request import Request,urlopen
+from urllib.request import Request,build_opener,ProxyHandler
 from urllib.error import HTTPError,URLError
 from .fetch import execute
+from .policy import egress_proxy,PolicyBlocked
 
 logging.basicConfig(level=os.getenv('LOG_LEVEL','INFO'),format='%(asctime)s %(levelname)s %(message)s')
 log=logging.getLogger('aivoya.worker')
@@ -14,8 +15,11 @@ log=logging.getLogger('aivoya.worker')
 def api_request(base,token,path,payload=None):
     data=json.dumps(payload).encode() if payload is not None else b'{}'
     req=Request(base+path,data=data,method='POST',headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'})
+    # The control plane is not acquisition egress. Never honor ambient proxies
+    # or AIVOYA_EGRESS_PROXY for claim/complete calls.
+    opener=build_opener(ProxyHandler({}))
     try:
-        with urlopen(req,timeout=35) as r:
+        with opener.open(req,timeout=35) as r:
             if r.status==204:return None
             return json.loads(r.read())
     except HTTPError as e:
@@ -34,6 +38,12 @@ def main():
         raise SystemExit('Scrapling engine requested but not installed; rebuild worker with INSTALL_SCRAPLING=true')
     if engine=='scrapling' and os.getenv('AIVOYA_ENV')=='production' and os.getenv('AIVOYA_EGRESS_GUARD_VERIFIED')!='true':
         raise SystemExit('Refusing production browser/HTTP Scrapling without verified external egress isolation')
+    try:
+        proxy=egress_proxy()
+    except PolicyBlocked as exc:
+        raise SystemExit(str(exc)) from exc
+    if proxy:
+        log.info('destination-address enforcement is delegated to the egress proxy %s',proxy)
     log.info('worker started engine=%s (Scrapling only enabled explicitly)',engine)
     failures=0
     while True:
