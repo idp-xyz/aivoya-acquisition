@@ -1,4 +1,4 @@
-.PHONY: test build up down import import-baseline smoke poc validate
+.PHONY: test build up down import import-baseline smoke poc validate manifest
 
 test:
 	GOPROXY=off go test ./internal/core
@@ -27,3 +27,6 @@ smoke:
 
 poc:
 	PYTHONPATH=worker python tools/poc_compare.py --config data/poc_targets.example.json --out results/poc.jsonl
+
+manifest:
+	python tools/update_manifest.py
