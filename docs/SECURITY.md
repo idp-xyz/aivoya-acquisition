@@ -10,10 +10,14 @@
 6. Failed or delayed completions cannot update a reclaimed lease because tokens are rotated.
 7. Revoked content rights cause immediate content/snapshot deletion, and policy versions prevent pending jobs from continuing.
 8. Original snapshots are stored in PostgreSQL BYTEA (max 2 MiB) for a short period: 7 days if rights are restricted, 30 days if licensed. Backups must honor retention and erasure rules too.
+9. Stdlib acquisition connects to the address validated for that hop and ignores ambient proxy variables. `AIVOYA_EGRESS_PROXY` (`http://host:port`, no credentials) is the only proxy; when it is set, destination-address enforcement for those fetches is delegated to the proxy. Control-plane calls also bypass proxies. Scrapling is not covered.
 
 ## Production P0 residual risks
 
-- Browser-based fetches can create nested resource requests and redirects. The code-level DNS check **does not fully prevent DNS rebinding** or loading arbitrary browser subresources. Use firewall/egress proxy and per-request host interception before enabling Scrapling.
+- Stdlib fetches are pinned to the validated address, and ambient proxy variables are ignored. Evidence is offline unit tests with a simulated resolver; this has not been run against a real hostile DNS server.
+- `AIVOYA_EGRESS_PROXY` sends stdlib acquisition through that proxy only. Destination-address enforcement is then delegated to the proxy, because the worker does not resolve the target locally. Startup logs that delegation.
+- Browser and Scrapling subresource requests and redirects are still unpinned. The code-level check does not stop those paths from reaching a private address. Use an egress allowlist and per-request host interception before enabling Scrapling.
+- The Compose `worker` service is still attached to the unrestricted `public` network. A network-level allowlist or firewall is still required before production.
 - `AIVOYA_USER_AGENT` must be configured with an actual operator contact approved for use; there is intentionally no fabricated website or contact address in defaults.
 - No per-operator RBAC (single admin key), network TLS termination, OAuth2/OIDC, centralized KMS secrets, immutable audit-storage, penetration test or SCA report included yet.
 - The basic extractor does not validate factual truth, image rights, author byline, entity linking or upstream content trust. Do not publish ingested full text without separately verified rights.
