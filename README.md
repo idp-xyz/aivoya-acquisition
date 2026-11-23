@@ -51,7 +51,7 @@ python tools/smoke.py
 
 Web 控制台：`http://127.0.0.1:8080/console`；健康检查：`/healthz`，就绪检查：`/readyz`。API 管理接口需要独立 Bearer 管理令牌；所有新来源默认 `pending` + `enabled=false`，绝不自动批准。
 
-**从已有 V1.0 升级时**：先备份原 PostgreSQL。API 启动执行版本迁移；批量重新导入**不会**覆盖已有来源的 endpoint/access_mode/rights，想启用新 GitHub API 连接器必须通过 `/configure` 修改入口并重新审批。详见 [工程决策说明](docs/ENGINEERING_DECISIONS.md)。
+**从已有 V1.0 升级时**：先备份原 PostgreSQL。API 启动执行版本迁移；批量重新导入**不会**覆盖已有来源的 origin/endpoint/access_mode/rights。要改采集入口、来源主机或启用新的 GitHub API 连接器，必须通过 `/configure` 修改并重新审批。详见 [工程决策说明](docs/ENGINEERING_DECISIONS.md)。
 
 ## 开发和测试
 

@@ -33,6 +33,14 @@ class TestExtraction(unittest.TestCase):
         self.assertEqual(items[0]['url'],'https://example.com/p1')
     def test_xml_entity_denied(self):
         with self.assertRaises(ValueError):feed_entries(b'<!DOCTYPE f [<!ENTITY x "y">]><f/>','https://example.com/feed')
+        with self.assertRaises(ValueError):feed_entries(b'<!DOCTYPE rss SYSTEM "http://evil.test/a.dtd"><rss/>','https://example.com/feed')
+        with self.assertRaises(ValueError):feed_entries(b'<rss><unclosed></rss>','https://example.com/feed')
+    def test_cdata_html_doctype_is_content(self):
+        xml=b'''<?xml version="1.0"?><rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>Changelog entry</title><link>https://github.blog/changelog/one</link><pubDate>Sat, 21 Nov 2026 01:00:00 GMT</pubDate><content:encoded><![CDATA[<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN"><p>Hi &amp; <!ENTITY x "y"></p>]]></content:encoded></item></channel></rss>'''
+        items=feed_entries(xml,'https://github.blog/changelog/feed/')
+        self.assertEqual(len(items),1)
+        self.assertEqual(items[0]['url'],'https://github.blog/changelog/one')
+        self.assertEqual(items[0]['published_at'],'2026-11-21T01:00:00Z')
     def test_denied_job_no_fetch(self):
         job={'schema_version':'1.0','job_id':'x','lease_token':'y','rights':'prohibited','method':'html_static','url':'https://example.com/'}
         res=execute(job)
