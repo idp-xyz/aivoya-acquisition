@@ -50,19 +50,17 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Materialize Go dependency checksums
-        run: go mod tidy && go mod verify
-      - name: Record resolved dependency versions
+      - name: Verify Go module lock file
         run: |
-          git diff -- go.mod || true
-          printf "Dependency resolution is pending lockfile review; CI records go.mod and go.sum for reproducible follow-up.\n"
+          go mod tidy -diff
+          go mod verify
       - name: Go unit + real database integration
         run: |
           set -o pipefail
           go test -count=1 -timeout=10m -v ./... 2>&1 | tee go-tests.log
       - name: Go vet
         run: go vet ./...
-      - name: Capture reproducible lock file for commit
+      - name: Upload Go acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
