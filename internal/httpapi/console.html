@@ -1,66 +1,271 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>AIVOYA · Acquisition Fabric Console</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AIVOYA · 采集管理后台</title>
 <style>
-:root{color-scheme:dark;--bg:#080f1b;--panel:#111c2b;--border:#253348;--secondary:#8fa0b4;--text:#e7f0fb;--cyan:#74d5e8;--violet:#a5a2ff;--green:#75d9b4;--orange:#ffc18a}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 10% 0%,#152b44 0%,transparent 38%),var(--bg);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text);line-height:1.5}
-header{padding:24px max(24px,calc((100% - 1400px)/2));border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
-.brand{font-size:22px;font-weight:800;letter-spacing:-.8px}.brand span{color:var(--cyan)}.eyebrow{font:11px/1.5 ui-monospace,monospace;letter-spacing:.2em;color:var(--secondary);text-transform:uppercase}
-.header-status{font-size:12px;padding:7px 12px;border-radius:30px;background:#152c37;border:1px solid #2c5c68;color:var(--green)}main{max-width:1448px;margin:0 auto;padding:32px 24px 100px}
-.hero{display:flex;justify-content:space-between;gap:24px;align-items:end;flex-wrap:wrap;margin-bottom:25px}h1{font-size:clamp(28px,4vw,47px);letter-spacing:-1.8px;font-weight:750;line-height:1.12;margin:12px 0 10px}h2{font-size:19px;margin:0;letter-spacing:-.4px}.muted{color:var(--secondary)}.hero p{max-width:740px;margin:0;color:var(--secondary)}
-.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}input,select{background:#0b1726;border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px 14px;font:inherit;outline:none;min-width:0}input:focus,select:focus{border-color:var(--cyan)}button{font:600 13px/1.4 inherit;font-family:inherit;color:var(--text);cursor:pointer;border:1px solid #344b60;border-radius:9px;background:#1b2b40;padding:11px 14px;white-space:nowrap}button:hover:not(:disabled){background:#263d55}button:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}button:disabled{opacity:.4;cursor:default}.primary{background:var(--cyan);border-color:var(--cyan);color:#06202a}.primary:hover:not(:disabled){background:#a5ebf5}.danger{border-color:#814e51;color:#ffb8b8}.small{font-size:12px;padding:6px 9px}
-.auth{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:15px 18px;border:1px solid var(--border);background:rgba(17,28,43,.86);border-radius:14px;margin-bottom:24px}.auth input{flex:1 1 330px}#message{font-size:12px;min-height:20px;color:var(--secondary)}
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:24px}.kpi{border:1px solid var(--border);background:linear-gradient(160deg,#17263b,#101a2a);border-radius:15px;padding:22px}.kpi .num{font-size:37px;letter-spacing:-1.3px;font-variant-numeric:tabular-nums;font-weight:750;margin-top:8px}.kpi .hint{font-size:12px;color:var(--secondary)}
-.columns{display:grid;grid-template-columns:1.1fr .9fr;gap:17px}.panel{background:rgba(17,28,43,.92);border:1px solid var(--border);border-radius:16px;min-width:0;margin-bottom:17px;overflow:hidden}.panel-head{padding:20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center}.panel-inner{padding:20px}.table-wrap{overflow-x:auto;max-height:450px;overflow-y:auto}table{width:100%;border-collapse:collapse;font-size:13px;min-width:570px}th{text-align:left;color:var(--secondary);font:11px/1.2 ui-monospace,monospace;letter-spacing:.07em;text-transform:uppercase;background:#162236;position:sticky;top:0}th,td{padding:13px 14px;border-bottom:1px solid #253347}tr:hover td{background:#18263a}td strong{font-weight:600}.ellip{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pill{border-radius:16px;padding:4px 9px;font-size:11px;white-space:nowrap;display:inline-block;background:#29344a;color:#bdcfe6}.approved,.succeeded{background:#153d39;color:#82e3bd}.pending,.review{background:#463725;color:#ffd09d}.blocked,.failed,.denied{background:#4b2632;color:#ffacb6}.leased{background:#233f57;color:#8cdbfc}
-.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.step{padding:15px;border:1px solid var(--border);background:#0b1726;border-radius:12px;text-align:center}.step .num{font:11px/1.6 ui-monospace,monospace;color:var(--cyan)}.step strong{font-size:13px;display:block;margin-top:6px}.step p{font-size:11px;margin:6px 0 0;color:var(--secondary)}
-.diagram{display:flex;gap:7px;flex-wrap:wrap;align-items:center}.diagram span{border:1px solid var(--border);background:#0c1b2d;padding:9px;border-radius:8px;font-size:12px}.diagram em{color:var(--cyan);font-style:normal}.footer-note{font-size:12px;color:var(--secondary);margin-top:22px}.empty{padding:22px;text-align:center;font-size:13px;color:var(--secondary)}
-@media(max-width:1020px){.columns{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.steps{grid-template-columns:repeat(3,1fr)}}@media(max-width:610px){main{padding:22px 13px 60px}header{padding:20px 16px}.kpis{gap:8px}.kpi{padding:14px}.kpi .num{font-size:28px}.steps{grid-template-columns:repeat(2,1fr)}.panel-head,.panel-inner{padding:15px}.hero h1{font-size:30px}}
+:root{color-scheme:dark;--bg:#070e15;--panel:#0e1924;--line:#243846;--text:#e7f3f7;--muted:#7f97a8;--mint:#70f1d0;--yellow:#f3c879;--red:#ff8b9a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+button,input,select{font:inherit;color:inherit}button{cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+.shell{min-height:100vh;display:flex}
+.nav{width:196px;flex-shrink:0;background:#091019;border-right:1px solid var(--line);padding:22px 14px;position:sticky;top:0;height:100vh}
+.brand{font-weight:800;letter-spacing:.08em;margin:0 8px 22px}.brand span{color:var(--mint)}
+.nav button{width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:8px;padding:10px 12px;color:#b7c9d4;margin-bottom:4px}
+.nav button.on{background:#143432;border-color:#2a6560;color:var(--mint)}
+.main{flex:1;min-width:0;padding:22px 26px 60px}
+.top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.top h1{font-size:22px;margin:0;font-weight:700}
+.spacer{flex:1}
+input,select{background:#0d1b26;border:1px solid #335266;border-radius:8px;padding:9px 11px}
+button.act{background:#14232f;border:1px solid #335266;border-radius:8px;padding:9px 12px}
+button.primary{background:var(--mint);color:#07312e;border-color:var(--mint);font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-size:28px;letter-spacing:-.04em}
+.stat span{color:var(--muted);font-size:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tools{display:flex;gap:8px;flex-wrap:wrap;padding:12px;border-bottom:1px solid var(--line)}
+.tools input[type="search"]{min-width:220px;flex:1}
+.table-wrap{overflow:auto;max-height:calc(100vh - 280px)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:10px 12px;border-bottom:1px solid #1d3140;text-align:left;vertical-align:top}
+th{position:sticky;top:0;background:#12202b;color:var(--muted);font-size:11px;letter-spacing:.06em}
+td .sub{color:var(--muted);font-size:12px}
+.pill{display:inline-block;border-radius:99px;padding:2px 8px;font-size:12px;background:#243246}
+.ok{background:#14382f;color:#9cf3d8}.wait{background:#3d3420;color:#ffd79a}.bad{background:#3d2228;color:#ffb3bd}
+.row-actions{display:flex;gap:6px;flex-wrap:wrap}
+.row-actions button{padding:5px 8px;font-size:12px}
+#status{min-height:1.4em;color:var(--muted);font-size:12px}
+.modal{position:fixed;inset:0;background:#000a;display:grid;place-items:center;padding:16px}
+.modal[hidden]{display:none}
+.card{width:min(520px,100%);background:#0f1e29;border:1px solid #315564;border-radius:14px;padding:20px}
+.card h2{margin:0 0 8px;font-size:18px}
+.card p{color:var(--muted);font-size:13px}
+label{display:block;margin:12px 0 6px;font-size:12px;color:#b7d0d8}
+label input,label select{width:100%;margin-top:6px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+a{color:#8ee7ff}
+@media(max-width:800px){.nav{width:100%;height:auto;position:static}.shell{display:block}.nav{display:flex;gap:6px;overflow:auto;padding:12px}.brand{display:none}.stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
-<header><div><div class="brand">AI<span>VOYA</span> <span style="color:#8c98b2;font-weight:500">/ Acquisition Fabric</span></div><div class="eyebrow">CONTROL PLANE · ENGINEERING CONSOLE · V1.1</div></div><div class="header-status">● POLICY FIRST · VERIFIED INGESTION</div></header>
-<main>
-<section class="hero"><div><div class="eyebrow">System observability / 采集系统控制台</div><h1>来源有序接入，<br/>每条事实都有来路。</h1><p>维护可追溯的来源注册表，运行受控采集，检查任务状态，并将原始证据与情报生成解耦。所有真实数据均来自后端 API。</p></div><div class="controls"><button id="refresh" class="primary">刷新数据</button><label for="upload" class="small muted">导入 JSON 来源注册表</label><input type="file" id="upload" accept=".json,application/json" style="max-width:185px;padding:7px"/></div></section>
-<section class="auth"><div style="min-width:155px"><strong>管理令牌</strong><div class="muted" style="font-size:11px">仅保存在本页面内存</div></div><input type="password" id="token" autocomplete="off" placeholder="粘贴 AIVOYA_ADMIN_TOKEN 后点击连接"/><button id="connect">连接控制平面</button><div id="message" role="status" aria-live="polite">等待连接</div></section>
-<section class="kpis"><article class="kpi"><div class="eyebrow">SOURCE REGISTRY</div><div id="k_sources" class="num">—</div><div class="hint">登记来源</div></article><article class="kpi"><div class="eyebrow">POLICY APPROVED</div><div id="k_approved" class="num">—</div><div class="hint">已审核并获准的来源</div></article><article class="kpi"><div class="eyebrow">QUALITY RECORDS</div><div id="k_records" class="num">—</div><div class="hint">可检索内容记录</div></article><article class="kpi"><div class="eyebrow">RAW EVIDENCE</div><div id="k_snapshots" class="num">—</div><div class="hint">证据快照（受保留策略约束）</div></article></section>
-<div class="columns">
-<div>
-<section class="panel"><div class="panel-head"><div><div class="eyebrow">01 / source governance</div><h2>来源注册与审批</h2></div><input id="search" placeholder="按来源 / 类别 / ID 筛选" aria-label="搜索来源"/></div><div class="table-wrap"><table><thead><tr><th>来源</th><th>采集方式</th><th>权利状态</th><th>管理</th></tr></thead><tbody id="source_table"><tr><td colspan="4" class="empty">请连接控制平面</td></tr></tbody></table></div><div class="panel-inner muted" style="font-size:12px">审批前默认禁用；审批时必须确认相应站点条款及内容使用权。右侧操作是针对已审核来源的明确授权。</div></section>
-<section class="panel"><div class="panel-head"><div><div class="eyebrow">02 / acquisition pipeline</div><h2>最近采集任务</h2></div><div class="muted" id="jobs_total" style="font-size:12px">—</div></div><div class="table-wrap"><table><thead><tr><th>任务 ID</th><th>来源</th><th>方式</th><th>状态</th><th>次数</th></tr></thead><tbody id="job_table"><tr><td colspan="5" class="empty">暂无任务</td></tr></tbody></table></div></section>
-<section class="panel"><div class="panel-head"><div><div class="eyebrow">02B / reliability monitoring</div><h2>最近 24 小时来源健康</h2></div><div class="muted" style="font-size:12px">终态任务成功率，不代表事实准确率</div></div><div class="table-wrap"><table><thead><tr><th>来源</th><th>任务</th><th>成功</th><th>复核</th><th>失败</th><th>终态成功率</th></tr></thead><tbody id="health_table"><tr><td colspan="6" class="empty">暂无数据</td></tr></tbody></table></div></section>
-</div><div>
-<section class="panel"><div class="panel-head"><div><div class="eyebrow">03 / canonical evidence contract</div><h2>采集链路</h2></div></div><div class="panel-inner"><div class="steps"><div class="step"><span class="num">01</span><strong>Registry</strong><p>来源策略</p></div><div class="step"><span class="num">02</span><strong>Lease</strong><p>任务租约</p></div><div class="step"><span class="num">03</span><strong>Fetch</strong><p>Python / Scrapling</p></div><div class="step"><span class="num">04</span><strong>Evidence</strong><p>SHA-256 快照</p></div><div class="step"><span class="num">05</span><strong>Validate</strong><p>质量校验</p></div></div><div style="margin-top:23px" class="eyebrow">INFORMATION FLOW</div><div class="diagram" style="margin-top:12px"><span>RSS / HTTP</span><em>→</em><span>Python Worker</span><em>→</em><span>PostgreSQL</span><em>→</em><span>Intelligence API（后续）</span></div><p class="footer-note">Scrapling 仅负责增强网页获取能力。本文档不将技术获取成功解释为内容版权许可或事实真实性保证。</p></div></section>
-<section class="panel"><div class="panel-head"><div><div class="eyebrow">04 / provenance</div><h2>最新有效记录</h2></div></div><div class="table-wrap"><table><thead><tr><th>标题 / 来源</th><th>类型</th><th>质量</th></tr></thead><tbody id="record_table"><tr><td colspan="3" class="empty">暂无记录</td></tr></tbody></table></div></section>
-<section class="panel"><div class="panel-head"><div><div class="eyebrow">05 / operational integrity</div><h2>运行准入原则</h2></div></div><div class="panel-inner"><p style="font-size:13px;margin:0 0 12px"><strong>默认拒绝：</strong>未审批来源、私网地址、付费墙和受限 URL。</p><p style="font-size:13px;margin:0 0 12px"><strong>版本化：</strong>采集任务和结果要求 Schema v1.0，租约过期后旧结果不可提交。</p><p style="font-size:13px;margin:0"><strong>审计：</strong>记录政策版本、原始 SHA-256 和执行结果。只有质量合格的内容进入正式记录。</p></div></section>
-</div>
-</div>
-<p class="footer-note">AIVOYA Internal Systems · Console 仅用于工程验证和管理，不面向公网直接暴露。所有页面数字均从 API 读取；无模拟运营数据。</p>
+<div class="shell">
+<aside class="nav">
+  <div class="brand">AI<span>VOYA</span></div>
+  <button type="button" class="on" data-view="sources">来源</button>
+  <button type="button" data-view="jobs">任务</button>
+  <button type="button" data-view="records">记录</button>
+  <button type="button" data-view="health">健康</button>
+</aside>
+<main class="main">
+  <div class="top">
+    <h1 id="title">来源</h1>
+    <div class="spacer"></div>
+    <input id="token" type="password" autocomplete="off" placeholder="管理令牌"/>
+    <button type="button" class="act primary" id="connect">连接</button>
+    <button type="button" class="act" id="refresh">刷新</button>
+    <label class="act">导入 JSON<input id="upload" type="file" accept="application/json,.json" hidden/></label>
+  </div>
+  <div id="status">连接后读取来源、任务、记录和健康。</div>
+  <section class="stats" aria-label="汇总">
+    <div class="stat"><b id="n-sources">—</b><span>来源</span></div>
+    <div class="stat"><b id="n-approved">—</b><span>已批准</span></div>
+    <div class="stat"><b id="n-records">—</b><span>记录</span></div>
+    <div class="stat"><b id="n-jobs">—</b><span>任务</span></div>
+  </section>
+  <section class="panel" id="view-sources">
+    <div class="tools">
+      <input id="q" type="search" placeholder="名称、ID 或类别" aria-label="搜索来源"/>
+      <select id="f-review" aria-label="审批状态"><option value="">全部审批</option><option>pending</option><option>approved</option><option>denied</option></select>
+      <select id="f-mode" aria-label="采集方式"><option value="">全部方式</option><option>rss</option><option>html_index</option><option>monitor</option><option>html_static</option><option>browser_render</option><option>github_releases</option><option>api</option><option>manual</option></select>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>来源</th><th>方式</th><th>权利</th><th>审批</th><th>间隔</th><th>操作</th></tr></thead><tbody id="sources"></tbody></table></div>
+  </section>
+  <section class="panel" id="view-jobs" hidden>
+    <div class="table-wrap"><table><thead><tr><th>任务</th><th>来源</th><th>方式</th><th>状态</th><th>次数</th><th>地址</th></tr></thead><tbody id="jobs"></tbody></table></div>
+  </section>
+  <section class="panel" id="view-records" hidden>
+    <div class="table-wrap"><table><thead><tr><th>标题</th><th>来源</th><th>类型</th><th>质量</th></tr></thead><tbody id="records"></tbody></table></div>
+  </section>
+  <section class="panel" id="view-health" hidden>
+    <div class="table-wrap"><table><thead><tr><th>来源</th><th>方式</th><th>任务</th><th>成功</th><th>复核</th><th>失败</th><th>阻断</th><th>成功率</th></tr></thead><tbody id="health"></tbody></table></div>
+  </section>
 </main>
+</div>
+<div class="modal" id="modal" hidden>
+  <form class="card" id="form">
+    <h2 id="modal-title">来源</h2>
+    <p id="modal-note"></p>
+    <div id="fields"></div>
+    <div class="modal-actions">
+      <button type="button" class="act" id="cancel">取消</button>
+      <button type="submit" class="act primary" id="save">保存</button>
+    </div>
+  </form>
+</div>
 <script>
-(()=>{
-'use strict';
-let token='',sources=[];
-const $=id=>document.getElementById(id);
-const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function msg(t,bad=false){$('message').textContent=t;$('message').style.color=bad?'#ffacb6':'#75d9b4'}
-async function call(path,options={}){if(!token)throw Error('请先输入管理令牌');const r=await fetch(path,{...options,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',...(options.headers||{})}});const txt=await r.text();let v={};try{v=txt?JSON.parse(txt):{}}catch{throw Error('服务返回格式异常')}if(!r.ok)throw Error(v.error||`HTTP ${r.status}`);return v}
-function pill(t){return `<span class="pill ${escape(t)}">${escape(t)}</span>`}
-function renderSources(){const q=$('search').value.toLowerCase();const list=sources.filter(s=>[s.name,s.source_id,s.category].join(' ').toLowerCase().includes(q));$('source_table').innerHTML=list.slice(0,100).map(s=>`<tr><td><strong>${escape(s.name)}</strong><div class="muted">${escape(s.source_id)} · ${escape(s.region)}</div></td><td>${escape(s.access_mode)}</td><td>${pill(s.review_status)}<div class="muted" style="font-size:11px">${escape(s.rights)}</div></td><td>${s.review_status==='pending'?`<button class="small" data-act="approve" data-id="${escape(s.source_id)}">审批</button>`:s.review_status==='approved'&&s.enabled?`<button class="small" data-act="enqueue" data-id="${escape(s.source_id)}">采集</button>`:`<span class="muted">${s.enabled?'':'禁用'}</span>`} <button class="small" data-act="configure" data-id="${escape(s.source_id)}">设置</button></td></tr>`).join('')||'<tr><td colspan="4" class="empty">没有匹配来源</td></tr>'}
-async function refresh(){try{const [st,src,jobs,records,health]=await Promise.all([call('/v1/stats'),call('/v1/sources'),call('/v1/jobs?limit=60'),call('/v1/records?limit=50'),call('/v1/operations/source-health')]);sources=src;$('k_sources').textContent=st.sources;$('k_approved').textContent=st.approved_sources;$('k_records').textContent=st.records;$('k_snapshots').textContent=st.snapshots;renderSources();const states=st.jobs||{};$('jobs_total').textContent=Object.entries(states).map(([a,b])=>a+': '+b).join(' / ')||'暂无任务';$('job_table').innerHTML=jobs.map(j=>`<tr><td><span title="${escape(j.job_id)}">${escape(j.job_id.slice(0,14))}…</span></td><td>${escape(j.source_id)}</td><td>${escape(j.method)}</td><td>${pill(j.status)}</td><td>${escape(j.attempt)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">暂无任务</td></tr>';$('health_table').innerHTML=health.filter(x=>x.jobs>0).slice(0,30).map(h=>`<tr><td>${escape(h.name)}<div class="muted">${escape(h.source_id)}</div></td><td>${h.jobs}</td><td>${h.succeeded}</td><td>${h.review}</td><td>${h.failed}</td><td>${h.terminal_success_ratio===null?'—':Math.round(h.terminal_success_ratio*100)+'%'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">最近 24 小时无任务</td></tr>';$('record_table').innerHTML=records.map(r=>`<tr><td class="ellip"><a style="color:var(--cyan)" href="${escape(r.url)}" target="_blank" rel="noopener noreferrer" title="${escape(r.title)}">${escape(r.title)}</a><div class="muted">${escape(r.source_id)}</div></td><td>${escape(r.kind)}</td><td>${Math.round(r.quality_score*100)}%</td></tr>`).join('')||'<tr><td colspan="3" class="empty">暂无记录</td></tr>';msg('数据已同步 · '+new Date().toLocaleTimeString())}catch(e){msg(e.message,true)}}
-$('connect').addEventListener('click',()=>{token=$('token').value.trim();$('token').value='';refresh()});$('refresh').addEventListener('click',refresh);$('search').addEventListener('input',renderSources);
-$('source_table').addEventListener('click',async e=>{const btn=e.target.closest('button[data-act]');if(!btn)return;const id=btn.dataset.id;try{if(btn.dataset.act==='configure'){
-    const current=sources.find(x=>x.source_id===id);
-    const origin_url=prompt('公开来源主机 URL。RSS 链接若在另一台已登记主机上，改这里；留空则保持原值。改变后需要重新审批',current?.origin_url||'');if(origin_url===null)return;
-    const endpoint_url=prompt('新的采集入口 URL（改变后需要重新审批）',current?.endpoint_url||'');if(!endpoint_url)return;
-    const access_mode=prompt('访问方式：rss / html_index / monitor / html_static / browser_render / github_releases / api / manual',current?.access_mode||'');if(!access_mode)return;
-    const interval_minutes=Number(prompt('采集间隔（分钟，5-10080）',String(current?.interval_minutes||60)));
-    const reviewer=prompt('变更人标识');if(!reviewer)return;const basis=prompt('变更原因 / 依据（至少 12 字符）');if(!basis)return;
-    if(!confirm('更改会暂停采集、撤销原有审批并清理旧数据，确认继续？'))return;
-    await call('/v1/sources/'+encodeURIComponent(id)+'/configure',{method:'POST',body:JSON.stringify({origin_url,endpoint_url,access_mode,interval_minutes,reviewer,basis})});
-  }else if(btn.dataset.act==='approve'){const rights=prompt('请在核实该来源访问与使用条款后输入权利级别：metadata_only / extract_only / full_text_licensed','metadata_only');if(!rights)return;if(!['metadata_only','extract_only','full_text_licensed'].includes(rights))throw Error('无效的权利级别');const reviewer=prompt('审批人标识（至少 3 字符）');if(!reviewer)return;const basis=prompt('审批依据：站点条款 URL、合同编号、适用条款等（至少 12 字符）');if(!basis)return;if(!confirm(`确认已审查 ${id} 的站点条款与数据使用权？\n当前操作会启用采集。`))return;await call('/v1/sources/'+encodeURIComponent(id)+'/approve',{method:'POST',body:JSON.stringify({rights,enabled:true,reviewer,basis})})}else{await call('/v1/sources/'+encodeURIComponent(id)+'/enqueue',{method:'POST',body:'{}'})}refresh()}catch(err){msg(err.message,true)}});
-$('upload').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;try{const doc=JSON.parse(await file.text());if(!Array.isArray(doc.sources))throw Error('JSON 必须有 sources 数组');const batches=[];for(let i=0;i<doc.sources.length;i+=500)batches.push(doc.sources.slice(i,i+500));let count=0;for(const batch of batches){const r=await call('/v1/sources/import',{method:'POST',body:JSON.stringify({sources:batch})});count+=r.imported}msg('导入 '+count+' 条来源（默认待审批）');refresh()}catch(err){msg(err.message,true)}finally{e.target.value=''}});
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const pill = (t, kind) => `<span class="pill ${kind || ''}">${esc(t)}</span>`;
+  const tone = t => t === 'approved' || t === 'succeeded' || t === true ? 'ok' : t === 'pending' || t === 'review' || t === 'leased' ? 'wait' : t === 'denied' || t === 'failed' || t === 'blocked' ? 'bad' : '';
+  const state = {token:'', view:'sources', sources:[], jobs:[], records:[], health:[], stats:{}, action:null, timer:null};
+  const titles = {sources:'来源', jobs:'任务', records:'记录', health:'健康'};
+
+  function say(text, bad){ const el = $('status'); el.textContent = text; el.style.color = bad ? 'var(--red)' : 'var(--muted)'; }
+  async function api(path, options={}){
+    if (!state.token) throw Error('先连接管理令牌');
+    const res = await fetch(path, {method:options.method || 'GET', headers:{Authorization:'Bearer '+state.token, 'Content-Type':'application/json'}, body:options.body, cache:'no-store'});
+    const raw = await res.text();
+    let data = {};
+    try { data = raw ? JSON.parse(raw) : {}; } catch { throw Error('服务返回的不是 JSON'); }
+    if (!res.ok) throw Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+  function field(name, label, value, type='text'){
+    return `<label>${esc(label)}<input name="${esc(name)}" type="${type}" value="${esc(value)}" ${type==='number'?'min="5" max="10080" required':''}/></label>`;
+  }
+  function select(name, label, value, options){
+    return `<label>${esc(label)}<select name="${esc(name)}">${options.map(o => `<option ${o===value?'selected':''}>${esc(o)}</option>`).join('')}</select></label>`;
+  }
+  function openModal(action, source){
+    state.action = {action, id: source.source_id};
+    $('modal-title').textContent = source.name;
+    const modes = ['rss','html_index','monitor','html_static','browser_render','github_releases','api','manual'];
+    const rights = ['metadata_only','extract_only','full_text_licensed'];
+    if (action === 'approve') {
+      $('modal-note').textContent = '审批后按所选权利启用采集。请填写依据。';
+      $('fields').innerHTML = select('rights','内容权利','metadata_only', rights) + field('reviewer','审核人','') + field('basis','依据','');
+    } else if (action === 'deny') {
+      $('modal-note').textContent = '拒绝后停用该来源，并清除已保存内容。';
+      $('fields').innerHTML = field('reviewer','审核人','') + field('basis','依据','');
+    } else {
+      $('modal-note').textContent = '修改入口或来源主机会撤销当前审批，并清除该来源已保存内容。';
+      $('fields').innerHTML = field('origin_url','来源主机', source.origin_url || '') + field('endpoint_url','采集入口', source.endpoint_url || '') + select('access_mode','采集方式', source.access_mode, modes) + field('interval_minutes','间隔（分钟）', source.interval_minutes || 60, 'number') + field('reviewer','变更人','') + field('basis','依据','');
+    }
+    $('modal').hidden = false;
+    $('fields').querySelector('input,select').focus();
+  }
+  function closeModal(){ $('modal').hidden = true; state.action = null; $('form').reset(); }
+  function filtered(){
+    const q = $('q').value.trim().toLowerCase();
+    const review = $('f-review').value;
+    const mode = $('f-mode').value;
+    return state.sources.filter(s => {
+      if (review && s.review_status !== review) return false;
+      if (mode && s.access_mode !== mode) return false;
+      return [s.name, s.source_id, s.category, s.origin_url].join(' ').toLowerCase().includes(q);
+    });
+  }
+  function renderSources(){
+    const rows = filtered();
+    $('sources').innerHTML = rows.map(s => `<tr>
+      <td><strong>${esc(s.name)}</strong><div class="sub">${esc(s.source_id)} · ${esc(s.region || '')}</div></td>
+      <td>${esc(s.access_mode)}</td>
+      <td>${esc(s.rights)}</td>
+      <td>${pill(s.review_status, tone(s.review_status))}<div class="sub">${s.enabled ? '已启用' : '未启用'}</div></td>
+      <td>${esc(s.interval_minutes)} 分钟</td>
+      <td class="row-actions">
+        ${s.review_status === 'pending' ? `<button type="button" class="act" data-act="approve" data-id="${esc(s.source_id)}">审批</button>` : ''}
+        ${s.review_status === 'approved' && s.enabled ? `<button type="button" class="act" data-act="enqueue" data-id="${esc(s.source_id)}">采集</button>` : ''}
+        <button type="button" class="act" data-act="configure" data-id="${esc(s.source_id)}">设置</button>
+        ${s.review_status !== 'denied' ? `<button type="button" class="act" data-act="deny" data-id="${esc(s.source_id)}">拒绝</button>` : ''}
+      </td></tr>`).join('') || '<tr><td colspan="6">没有匹配来源</td></tr>';
+  }
+  function renderJobs(){
+    $('jobs').innerHTML = state.jobs.map(j => `<tr><td class="sub">${esc(j.job_id)}</td><td>${esc(j.source_id)}</td><td>${esc(j.method)}</td><td>${pill(j.status, tone(j.status))}</td><td>${esc(j.attempt)}</td><td class="sub">${esc(j.url)}</td></tr>`).join('') || '<tr><td colspan="6">暂无任务</td></tr>';
+  }
+  function renderRecords(){
+    $('records').innerHTML = state.records.map(r => `<tr><td><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a></td><td>${esc(r.source_id)}</td><td>${esc(r.kind)}</td><td>${Math.round((r.quality_score || 0) * 100)}%</td></tr>`).join('') || '<tr><td colspan="4">暂无记录</td></tr>';
+  }
+  function renderHealth(){
+    $('health').innerHTML = state.health.map(h => `<tr><td><strong>${esc(h.name)}</strong><div class="sub">${esc(h.source_id)} · ${h.enabled ? '已启用' : '未启用'}</div></td><td>${esc(h.access_mode)}</td><td>${esc(h.jobs)}</td><td>${esc(h.succeeded)}</td><td>${esc(h.review)}</td><td>${esc(h.failed)}</td><td>${esc(h.blocked)}</td><td>${h.terminal_success_ratio == null ? '—' : Math.round(h.terminal_success_ratio * 100) + '%'}</td></tr>`).join('') || '<tr><td colspan="8">暂无健康数据</td></tr>';
+  }
+  function render(){
+    const jobs = state.stats.jobs || {};
+    const jobCount = Object.values(jobs).reduce((n, v) => n + Number(v || 0), 0);
+    $('n-sources').textContent = state.stats.sources ?? '—';
+    $('n-approved').textContent = state.stats.approved_sources ?? '—';
+    $('n-records').textContent = state.stats.records ?? '—';
+    $('n-jobs').textContent = jobCount || '—';
+    renderSources(); renderJobs(); renderRecords(); renderHealth();
+  }
+  async function load(){
+    const [stats, sources, jobs, records, health] = await Promise.all([
+      api('/v1/stats'), api('/v1/sources'), api('/v1/jobs?limit=200'), api('/v1/records?limit=200'), api('/v1/operations/source-health')
+    ]);
+    state.stats = stats; state.sources = sources; state.jobs = jobs; state.records = records; state.health = health;
+    render();
+    say(`已同步 ${sources.length} 个来源 · ${new Date().toLocaleTimeString()}`);
+  }
+  function show(view){
+    state.view = view;
+    $('title').textContent = titles[view];
+    for (const name of Object.keys(titles)) $('view-' + name).hidden = name !== view;
+    document.querySelectorAll('.nav button').forEach(btn => btn.classList.toggle('on', btn.dataset.view === view));
+  }
+  $('connect').onclick = async () => {
+    state.token = $('token').value.trim();
+    $('token').value = '';
+    try { await load(); clearInterval(state.timer); state.timer = setInterval(() => load().catch(e => say(e.message, true)), 15000); }
+    catch (e) { state.token = ''; say(e.message, true); }
+  };
+  $('refresh').onclick = () => load().catch(e => say(e.message, true));
+  $('q').oninput = renderSources;
+  $('f-review').onchange = renderSources;
+  $('f-mode').onchange = renderSources;
+  document.querySelector('.nav').onclick = e => { const btn = e.target.closest('button[data-view]'); if (btn) show(btn.dataset.view); };
+  $('sources').onclick = async e => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const source = state.sources.find(s => s.source_id === btn.dataset.id);
+    if (!source) return;
+    if (btn.dataset.act === 'enqueue') {
+      try { await api('/v1/sources/' + encodeURIComponent(source.source_id) + '/enqueue', {method:'POST', body:'{}'}); say('已提交采集：' + source.source_id); await load(); }
+      catch (err) { say(err.message, true); }
+      return;
+    }
+    openModal(btn.dataset.act, source);
+  };
+  $('cancel').onclick = closeModal;
+  $('modal').onclick = e => { if (e.target === $('modal')) closeModal(); };
+  $('form').onsubmit = async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target).entries());
+    const id = state.action.id;
+    try {
+      if (state.action.action === 'approve') {
+        await api('/v1/sources/' + encodeURIComponent(id) + '/approve', {method:'POST', body:JSON.stringify({rights:data.rights, enabled:true, reviewer:data.reviewer, basis:data.basis})});
+      } else if (state.action.action === 'deny') {
+        await api('/v1/sources/' + encodeURIComponent(id) + '/deny', {method:'POST', body:JSON.stringify({reviewer:data.reviewer, basis:data.basis})});
+      } else {
+        await api('/v1/sources/' + encodeURIComponent(id) + '/configure', {method:'POST', body:JSON.stringify({origin_url:data.origin_url, endpoint_url:data.endpoint_url, access_mode:data.access_mode, interval_minutes:Number(data.interval_minutes), reviewer:data.reviewer, basis:data.basis})});
+      }
+      closeModal();
+      await load();
+    } catch (err) { say(err.message, true); }
+  };
+  $('upload').onchange = async e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const doc = JSON.parse(await file.text());
+      if (!Array.isArray(doc.sources)) throw Error('JSON 必须包含 sources 数组');
+      let count = 0;
+      for (let i = 0; i < doc.sources.length; i += 500) {
+        const res = await api('/v1/sources/import', {method:'POST', body:JSON.stringify({sources:doc.sources.slice(i, i + 500)})});
+        count += res.imported;
+      }
+      say('已导入 ' + count + ' 条来源，新来源默认待审');
+      await load();
+    } catch (err) { say(err.message, true); }
+  };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 })();
 </script>
-</body></html>
+</body>
+</html>
