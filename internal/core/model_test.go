@@ -2,6 +2,13 @@ package core
 
 import "testing"
 
+func TestUUIDIsValidSourceID(t *testing.T) {
+	id := UUID()
+	if err := CheckSource(Source{ID: id, Name: "Generated", OriginURL: "https://example.com/news", EndpointURL: "https://example.com/news", AccessMode: "rss", Rights: "metadata_only", IntervalMinutes: 60}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestCanonicalURL(t *testing.T) {
 	got, e := CanonicalURL("https://EXAMPLE.com/a?utm_source=x&b=1#frag")
 	if e == nil {

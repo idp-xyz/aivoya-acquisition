@@ -20,6 +20,7 @@ type Source struct {
 	Region               string `json:"region"`
 	Language             string `json:"language"`
 	Category             string `json:"category"`
+	CategoryID           string `json:"category_id"`
 	SourceMode           string `json:"source_mode"`
 	OnboardingBatch      string `json:"onboarding_batch"`
 	EndpointVerification string `json:"endpoint_verification"`
@@ -31,6 +32,13 @@ type Source struct {
 	PolicyVersion        int    `json:"policy_version"`
 	Enabled              bool   `json:"enabled"`
 	IntervalMinutes      int    `json:"interval_minutes"`
+}
+
+type Category struct {
+	ID        string `json:"category_id"`
+	Name      string `json:"name"`
+	SortOrder int    `json:"sort_order"`
+	Sources   int    `json:"sources"`
 }
 
 type FeedEntry struct {
@@ -202,6 +210,16 @@ func ID(prefix string) string {
 		panic(err)
 	}
 	return prefix + hex.EncodeToString(b[:])
+}
+
+func UUID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic(err)
+	}
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%s-%s-%s-%s-%s", hex.EncodeToString(b[0:4]), hex.EncodeToString(b[4:6]), hex.EncodeToString(b[6:8]), hex.EncodeToString(b[8:10]), hex.EncodeToString(b[10:]))
 }
 func Score(title, body string) float64 {
 	// Deterministic heuristic only; never mislabel this as article correctness.

@@ -35,9 +35,66 @@ func (s Server) Routes() http.Handler {
 		send(w, 200, map[string]string{"status": "ready"})
 	})
 	mux.Handle("GET /v1/stats", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { v, e := s.Store.Stats(r.Context()); respond(w, v, e) })))
+	mux.Handle("GET /v1/operations/hourly-results", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		v, e := s.Store.HourlyResults(r.Context())
+		respond(w, v, e)
+	})))
+	mux.Handle("GET /v1/operations/category-yield", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		v, e := s.Store.CategoryYield(r.Context())
+		respond(w, v, e)
+	})))
 	mux.Handle("GET /v1/operations/source-health", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		v, e := s.Store.SourceHealth(r.Context())
 		respond(w, v, e)
+	})))
+	mux.Handle("GET /v1/categories", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		v, e := s.Store.ListCategories(r.Context())
+		respond(w, v, e)
+	})))
+	mux.Handle("POST /v1/categories", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Name string `json:"name"`
+		}
+		if !decode(w, r, &req) {
+			return
+		}
+		v, e := s.Store.CreateCategory(r.Context(), req.Name)
+		respond(w, v, e)
+	})))
+	mux.Handle("POST /v1/categories/reorder", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			CategoryIDs []string `json:"category_ids"`
+		}
+		if !decode(w, r, &req) {
+			return
+		}
+		e := s.Store.ReorderCategories(r.Context(), req.CategoryIDs)
+		respond(w, map[string]any{"ordered": len(req.CategoryIDs)}, e)
+	})))
+	mux.Handle("POST /v1/categories/{id}/rename", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Name string `json:"name"`
+		}
+		if !decode(w, r, &req) {
+			return
+		}
+		e := s.Store.RenameCategory(r.Context(), r.PathValue("id"), req.Name)
+		respond(w, map[string]any{"category_id": r.PathValue("id"), "name": req.Name}, e)
+	})))
+	mux.Handle("DELETE /v1/categories/{id}", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		detach := r.URL.Query().Get("detach") == "true"
+		e := s.Store.DeleteCategory(r.Context(), r.PathValue("id"), detach)
+		respond(w, map[string]any{"deleted": r.PathValue("id"), "detached_sources": detach}, e)
+	})))
+	mux.Handle("POST /v1/sources/{id}/category", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			CategoryID string `json:"category_id"`
+		}
+		if !decode(w, r, &req) {
+			return
+		}
+		e := s.Store.AssignCategory(r.Context(), r.PathValue("id"), req.CategoryID)
+		respond(w, map[string]any{"source_id": r.PathValue("id"), "category_id": req.CategoryID}, e)
 	})))
 	mux.Handle("GET /v1/sources", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		v, e := s.Store.ListSources(r.Context(), 500)
@@ -104,6 +161,7 @@ func (s Server) Routes() http.Handler {
 		v, e := s.Store.ListRecords(r.Context(), pageLimit(r))
 		respond(w, v, e)
 	})))
+	mux.Handle("GET /v1/records/search", s.auth(false, http.HandlerFunc(s.searchRecords)))
 	mux.Handle("GET /v1/records/{id}", s.auth(false, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		v, e := s.Store.GetRecord(r.Context(), r.PathValue("id"))
 		respond(w, v, e)
@@ -142,6 +200,60 @@ func (s Server) Routes() http.Handler {
 	})
 	return requestLog(mux, s.Logger)
 }
+func (s Server) searchRecords(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	var since, until *time.Time
+	if hour := strings.TrimSpace(q.Get("hour")); hour != "" {
+		parsed, err := time.Parse(time.RFC3339Nano, hour)
+		if err != nil {
+			parsed, err = time.Parse(time.RFC3339, hour)
+		}
+		if err != nil {
+			respond(w, nil, errors.New("invalid hour"))
+			return
+		}
+		start := parsed.UTC().Truncate(time.Hour)
+		end := start.Add(time.Hour)
+		since, until = &start, &end
+	} else {
+		switch q.Get("range") {
+		case "", "24h":
+			start := time.Now().Add(-24 * time.Hour)
+			since = &start
+		case "7d":
+			start := time.Now().Add(-7 * 24 * time.Hour)
+			since = &start
+		case "all":
+		default:
+			respond(w, nil, errors.New("invalid range"))
+			return
+		}
+	}
+	title := strings.TrimSpace(q.Get("q"))
+	if len([]rune(title)) > 80 {
+		respond(w, nil, errors.New("invalid query"))
+		return
+	}
+	var before *time.Time
+	beforeID := strings.TrimSpace(q.Get("before_id"))
+	if raw := strings.TrimSpace(q.Get("before")); raw != "" {
+		parsed, err := time.Parse(time.RFC3339Nano, raw)
+		if err != nil {
+			parsed, err = time.Parse(time.RFC3339, raw)
+		}
+		if err != nil || beforeID == "" {
+			respond(w, nil, errors.New("invalid cursor"))
+			return
+		}
+		before = &parsed
+	} else if beforeID != "" {
+		respond(w, nil, errors.New("invalid cursor"))
+		return
+	}
+	page, err := s.Store.SearchRecords(r.Context(), since, until, strings.TrimSpace(q.Get("source_id")), strings.TrimSpace(q.Get("category_id")), title, before, beforeID, 50)
+	respond(w, page, err)
+}
+
 func pageLimit(r *http.Request) int {
 	n, e := strconv.Atoi(r.URL.Query().Get("limit"))
 	if e != nil || n < 1 {
@@ -205,7 +317,7 @@ func fail(w http.ResponseWriter, e error) {
 }
 func isInvalid(e error) bool {
 	t := e.Error()
-	for _, v := range []string{"invalid", "not approved", "requires dedicated", "active job exists", "unknown completion", "missing", "mismatch", "non-2xx", "raw snapshot", "redirect changed", "unsupported schema", "private", "not allowed", "non-standard", "URL must", "bulk limit", "quality", "reviewer and basis"} {
+	for _, v := range []string{"invalid", "not approved", "requires dedicated", "active job exists", "unknown completion", "missing", "mismatch", "non-2xx", "raw snapshot", "redirect changed", "unsupported schema", "private", "not allowed", "non-standard", "URL must", "bulk limit", "quality", "reviewer and basis", "category", "interval"} {
 		if strings.Contains(t, v) {
 			return true
 		}
