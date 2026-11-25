@@ -133,6 +133,85 @@ func TestIntegrationUpdateOriginResetsApproval(t *testing.T) {
 	}
 }
 
+func TestIntegrationCategoriesPersistAndAssign(t *testing.T) {
+	s, ctx := integrationDB(t)
+	id := "it-cat-" + core.ID("")[:12]
+	_, err := s.Register(ctx, []core.Source{{ID: id, Name: "Category source", OriginURL: "https://example.com/news", EndpointURL: "https://example.com/news", AccessMode: "html_index", Category: "模型发布", Rights: "metadata_only", IntervalMinutes: 60}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cats, err := s.ListCategories(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var original core.Category
+	for _, item := range cats {
+		if item.Name == "模型发布" {
+			original = item
+		}
+	}
+	if original.ID == "" || original.Sources < 1 {
+		t.Fatalf("imported label was not persisted: %+v", cats)
+	}
+	created, err := s.CreateCategory(ctx, "基础设施")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.AssignCategory(ctx, id, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	var label, linked string
+	if err = s.DB.QueryRow(ctx, `SELECT category, category_id FROM sources WHERE source_id=$1`, id).Scan(&label, &linked); err != nil {
+		t.Fatal(err)
+	}
+	if label != "基础设施" || linked != created.ID {
+		t.Fatalf("assignment = %s %s", label, linked)
+	}
+	if err = s.RenameCategory(ctx, created.ID, "基础设施平台"); err != nil {
+		t.Fatal(err)
+	}
+	var status string
+	var version int
+	if err = s.DB.QueryRow(ctx, `SELECT category, review_status, policy_version FROM sources WHERE source_id=$1`, id).Scan(&label, &status, &version); err != nil || label != "基础设施平台" || status != "pending" || version != 1 {
+		t.Fatalf("rename changed source policy: label=%s status=%s version=%d err=%v", label, status, version, err)
+	}
+	if _, err = s.Register(ctx, []core.Source{{ID: id, Name: "Category source", OriginURL: "https://example.com/news", EndpointURL: "https://example.com/news", AccessMode: "html_index", Category: "模型发布", Rights: "metadata_only", IntervalMinutes: 60}}); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.DB.QueryRow(ctx, `SELECT category, category_id FROM sources WHERE source_id=$1`, id).Scan(&label, &linked); err != nil || label != "基础设施平台" || linked != created.ID {
+		t.Fatalf("import overwrote maintained category: %s %s %v", label, linked, err)
+	}
+	ordered := make([]string, 0, len(cats))
+	for _, item := range cats {
+		if item.ID != created.ID {
+			ordered = append(ordered, item.ID)
+		}
+	}
+	ordered = append(ordered, created.ID)
+	if err = s.ReorderCategories(ctx, []string{created.ID}); err == nil {
+		t.Fatal("partial category order was accepted")
+	}
+	if err = s.ReorderCategories(ctx, ordered); err != nil {
+		t.Fatal(err)
+	}
+	if cats, err = s.ListCategories(ctx); err != nil || cats[len(cats)-1].ID != created.ID {
+		t.Fatalf("reorder = %+v %v", cats, err)
+	}
+	if err = s.DeleteCategory(ctx, created.ID, false); err == nil {
+		t.Fatal("deleted a category that still has sources")
+	}
+	if err = s.DeleteCategory(ctx, created.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	var clearedID *string
+	if err = s.DB.QueryRow(ctx, `SELECT category, category_id, review_status, policy_version FROM sources WHERE source_id=$1`, id).Scan(&label, &clearedID, &status, &version); err != nil || label != "" || clearedID != nil || status != "pending" || version != 1 {
+		t.Fatalf("detach changed source policy: label=%q id=%v status=%s version=%d err=%v", label, clearedID, status, version, err)
+	}
+	if err = s.DeleteCategory(ctx, original.ID, false); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestIntegrationV11RetryAfterDomainCooldown(t *testing.T) {
 	s, ctx := integrationDB(t)
 	id := "it-cooldown-" + core.ID("")[:16]
