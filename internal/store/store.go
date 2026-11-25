@@ -84,7 +84,32 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if err = ensureCategories(ctx, tx); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
+}
+
+func ensureCategories(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `
+INSERT INTO categories(category_id, name)
+SELECT DISTINCT
+  CASE WHEN btrim(category) ~ '^[a-z0-9][a-z0-9-]{0,40}$' THEN btrim(category)
+       ELSE 'c-' || substr(md5(btrim(category)), 1, 12) END,
+  btrim(category)
+FROM sources
+WHERE btrim(category) <> ''
+  AND NOT EXISTS (SELECT 1 FROM categories c WHERE c.name = btrim(sources.category))
+ON CONFLICT (category_id) DO NOTHING`); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `
+UPDATE sources s
+SET category_id = c.category_id
+FROM categories c
+WHERE btrim(s.category) = c.name
+  AND s.category_id IS DISTINCT FROM c.category_id`)
+	return err
 }
 func (s *Store) Register(ctx context.Context, items []core.Source) (int, error) {
 	if len(items) > 500 {
@@ -106,17 +131,23 @@ func (s *Store) Register(ctx context.Context, items []core.Source) (int, error) 
 		if v.EndpointURL == "" {
 			v.EndpointURL = v.OriginURL
 		}
+		if strings.TrimSpace(v.ID) == "" {
+			v.ID = core.UUID()
+		}
 		if e := core.CheckSource(v); e != nil {
 			return n, fmt.Errorf("%s: %w", v.ID, e)
 		}
-		// Deliberately never overwrite approval, rights, enabled or policy version on import.
+		// Deliberately never overwrite approval, rights, enabled, policy version, or a maintained category on import.
 		_, e := tx.Exec(ctx, `INSERT INTO sources(source_id,name,origin_url,endpoint_url,region,language,category,source_mode,access_mode,interval_minutes,onboarding_batch,endpoint_verification,endpoint_hint,ingestion_notes)
  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
- ON CONFLICT(source_id) DO UPDATE SET name=EXCLUDED.name,region=EXCLUDED.region,language=EXCLUDED.language,category=EXCLUDED.category,source_mode=EXCLUDED.source_mode,onboarding_batch=EXCLUDED.onboarding_batch,endpoint_verification=EXCLUDED.endpoint_verification,endpoint_hint=EXCLUDED.endpoint_hint,ingestion_notes=EXCLUDED.ingestion_notes,updated_at=now()`, v.ID, v.Name, v.OriginURL, v.EndpointURL, v.Region, v.Language, v.Category, v.SourceMode, v.AccessMode, v.IntervalMinutes, v.OnboardingBatch, v.EndpointVerification, v.EndpointHint, v.IngestionNotes)
+ ON CONFLICT(source_id) DO UPDATE SET name=EXCLUDED.name,region=EXCLUDED.region,language=EXCLUDED.language,source_mode=EXCLUDED.source_mode,onboarding_batch=EXCLUDED.onboarding_batch,endpoint_verification=EXCLUDED.endpoint_verification,endpoint_hint=EXCLUDED.endpoint_hint,ingestion_notes=EXCLUDED.ingestion_notes,updated_at=now()`, v.ID, v.Name, v.OriginURL, v.EndpointURL, v.Region, v.Language, v.Category, v.SourceMode, v.AccessMode, v.IntervalMinutes, v.OnboardingBatch, v.EndpointVerification, v.EndpointHint, v.IngestionNotes)
 		if e != nil {
 			return n, e
 		}
 		n++
+	}
+	if e = ensureCategories(ctx, tx); e != nil {
+		return n, e
 	}
 	if e = tx.Commit(ctx); e != nil {
 		return 0, e
@@ -124,7 +155,7 @@ func (s *Store) Register(ctx context.Context, items []core.Source) (int, error) 
 	return n, nil
 }
 func (s *Store) ListSources(ctx context.Context, limit int) ([]core.Source, error) {
-	rows, e := s.DB.Query(ctx, `SELECT source_id,name,origin_url,endpoint_url,region,language,category,source_mode,access_mode,rights,review_status,policy_version,enabled,interval_minutes,onboarding_batch,endpoint_verification,endpoint_hint,ingestion_notes FROM sources ORDER BY source_id LIMIT $1`, limit)
+	rows, e := s.DB.Query(ctx, `SELECT source_id,name,origin_url,endpoint_url,region,language,category,COALESCE(category_id,''),source_mode,access_mode,rights,review_status,policy_version,enabled,interval_minutes,onboarding_batch,endpoint_verification,endpoint_hint,ingestion_notes FROM sources ORDER BY source_id LIMIT $1`, limit)
 	if e != nil {
 		return nil, e
 	}
@@ -132,7 +163,7 @@ func (s *Store) ListSources(ctx context.Context, limit int) ([]core.Source, erro
 	out := []core.Source{}
 	for rows.Next() {
 		var v core.Source
-		if e = rows.Scan(&v.ID, &v.Name, &v.OriginURL, &v.EndpointURL, &v.Region, &v.Language, &v.Category, &v.SourceMode, &v.AccessMode, &v.Rights, &v.ReviewStatus, &v.PolicyVersion, &v.Enabled, &v.IntervalMinutes, &v.OnboardingBatch, &v.EndpointVerification, &v.EndpointHint, &v.IngestionNotes); e != nil {
+		if e = rows.Scan(&v.ID, &v.Name, &v.OriginURL, &v.EndpointURL, &v.Region, &v.Language, &v.Category, &v.CategoryID, &v.SourceMode, &v.AccessMode, &v.Rights, &v.ReviewStatus, &v.PolicyVersion, &v.Enabled, &v.IntervalMinutes, &v.OnboardingBatch, &v.EndpointVerification, &v.EndpointHint, &v.IngestionNotes); e != nil {
 			return nil, e
 		}
 		out = append(out, v)
@@ -597,6 +628,57 @@ func (s *Store) Stats(ctx context.Context) (map[string]any, error) {
 	out["jobs"] = statuses
 	return out, rows.Err()
 }
+
+func (s *Store) HourlyResults(ctx context.Context) ([]map[string]any, error) {
+	rows, err := s.DB.Query(ctx, `
+WITH hours AS (
+  SELECT generate_series(date_trunc('hour', now()) - interval '23 hours', date_trunc('hour', now()), interval '1 hour') AS hour
+)
+SELECT h.hour, count(r.record_id)
+FROM hours h
+LEFT JOIN records r ON r.created_at >= h.hour AND r.created_at < h.hour + interval '1 hour'
+GROUP BY h.hour
+ORDER BY h.hour`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]map[string]any, 0, 24)
+	for rows.Next() {
+		var hour time.Time
+		var count int64
+		if err = rows.Scan(&hour, &count); err != nil {
+			return nil, err
+		}
+		out = append(out, map[string]any{"hour": hour, "records": count})
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) CategoryYield(ctx context.Context) ([]map[string]any, error) {
+	rows, err := s.DB.Query(ctx, `
+SELECT COALESCE(NULLIF(btrim(s.category),''),'未分类') AS name, count(r.record_id)
+FROM records r
+JOIN sources s ON s.source_id=r.source_id
+WHERE r.created_at >= now() - interval '24 hours'
+GROUP BY 1
+ORDER BY count(r.record_id) DESC, name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var name string
+		var count int64
+		if err = rows.Scan(&name, &count); err != nil {
+			return nil, err
+		}
+		out = append(out, map[string]any{"name": name, "records": count})
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) ListJobs(ctx context.Context, limit int) ([]map[string]any, error) {
 	rows, e := s.DB.Query(ctx, `SELECT job_id,source_id,target_url,method,status,attempt,created_at,last_error_code FROM jobs ORDER BY created_at DESC LIMIT $1`, limit)
 	if e != nil {
@@ -637,6 +719,65 @@ func (s *Store) ListRecords(ctx context.Context, limit int) ([]map[string]any, e
 		r = append(r, map[string]any{"record_id": id, "source_id": source, "url": url, "title": title, "kind": kind, "quality_score": score, "created_at": created})
 	}
 	return r, rows.Err()
+}
+
+type RecordSearch struct {
+	Records      []map[string]any `json:"records"`
+	NextBefore   *time.Time       `json:"next_before,omitempty"`
+	NextBeforeID string           `json:"next_before_id,omitempty"`
+}
+
+func (s *Store) SearchRecords(ctx context.Context, since, until *time.Time, sourceID, categoryID, title string, before *time.Time, beforeID string, limit int) (RecordSearch, error) {
+	if limit < 1 || limit > 50 {
+		limit = 50
+	}
+	pattern := ""
+	if title = strings.TrimSpace(title); title != "" {
+		pattern = "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(title) + "%"
+	}
+	rows, err := s.DB.Query(ctx, `
+SELECT r.record_id, r.source_id, s.name, COALESCE(s.category,''), COALESCE(s.category_id,''),
+  r.canonical_url, r.title, r.record_kind, r.quality_score, r.created_at, r.published_at, r.acquired_at
+FROM records r
+JOIN sources s ON s.source_id=r.source_id
+WHERE ($1::timestamptz IS NULL OR r.created_at >= $1)
+  AND ($2::timestamptz IS NULL OR r.created_at < $2)
+  AND ($3 = '' OR r.source_id = $3)
+  AND ($4 = '' OR ($4 = 'none' AND s.category_id IS NULL) OR s.category_id = $4)
+  AND ($5 = '' OR r.title ILIKE $5 ESCAPE '\')
+  AND ($6::timestamptz IS NULL OR r.created_at < $6 OR (r.created_at = $6 AND r.record_id < $7))
+ORDER BY r.created_at DESC, r.record_id DESC
+LIMIT $8`, since, until, sourceID, categoryID, pattern, before, beforeID, limit+1)
+	if err != nil {
+		return RecordSearch{}, err
+	}
+	defer rows.Close()
+	out := make([]map[string]any, 0, limit)
+	for rows.Next() {
+		var id, source, name, category, categoryID, url, title, kind string
+		var score float64
+		var created, acquired time.Time
+		var published *time.Time
+		if err = rows.Scan(&id, &source, &name, &category, &categoryID, &url, &title, &kind, &score, &created, &published, &acquired); err != nil {
+			return RecordSearch{}, err
+		}
+		out = append(out, map[string]any{
+			"record_id": id, "source_id": source, "source_name": name, "category": category, "category_id": categoryID,
+			"url": url, "title": title, "kind": kind, "quality_score": score, "created_at": created, "published_at": published, "acquired_at": acquired,
+		})
+	}
+	if err = rows.Err(); err != nil {
+		return RecordSearch{}, err
+	}
+	page := RecordSearch{Records: out}
+	if len(out) > limit {
+		last := out[limit-1]
+		page.Records = out[:limit]
+		created := last["created_at"].(time.Time)
+		page.NextBefore = &created
+		page.NextBeforeID = last["record_id"].(string)
+	}
+	return page, nil
 }
 
 // ReapExpired converts exhausted leases into terminal failures rather than
@@ -705,14 +846,16 @@ func (s *Store) GetRecord(ctx context.Context, id string) (map[string]any, error
 	var acquired time.Time
 	var score float64
 	var rights string
-	e := s.DB.QueryRow(ctx, `SELECT r.record_id,r.source_id,r.job_id,r.snapshot_id,r.canonical_url,r.content_sha256,r.raw_sha256,r.title,r.body_text,r.language,r.published_at,r.acquired_at,r.extractor_name,r.extractor_version,r.quality_score,r.record_kind,s.rights FROM records r JOIN sources s USING(source_id) WHERE r.record_id=$1`, id).Scan(&recordID, &sourceID, &jobID, &snapshotID, &canonical, &contentHash, &rawHash, &title, &body, &lang, &published, &acquired, &engine, &version, &score, &kind, &rights)
+	var sourceName, category string
+	var created time.Time
+	e := s.DB.QueryRow(ctx, `SELECT r.record_id,r.source_id,s.name,COALESCE(s.category,''),r.job_id,r.snapshot_id,r.canonical_url,r.content_sha256,r.raw_sha256,r.title,r.body_text,r.language,r.published_at,r.acquired_at,r.created_at,r.extractor_name,r.extractor_version,r.quality_score,r.record_kind,s.rights FROM records r JOIN sources s USING(source_id) WHERE r.record_id=$1`, id).Scan(&recordID, &sourceID, &sourceName, &category, &jobID, &snapshotID, &canonical, &contentHash, &rawHash, &title, &body, &lang, &published, &acquired, &created, &engine, &version, &score, &kind, &rights)
 	if e != nil {
 		return nil, e
 	}
 	if rights != "full_text_licensed" {
 		body = ""
 	}
-	return map[string]any{"record_id": recordID, "source_id": sourceID, "job_id": jobID, "snapshot_id": snapshotID, "canonical_url": canonical, "raw_sha256": rawHash, "content_sha256": contentHash, "title": title, "body_text": body, "language": lang, "published_at": published, "acquired_at": acquired, "extractor_name": engine, "extractor_version": version, "quality_score": score, "record_kind": kind, "rights": rights}, nil
+	return map[string]any{"record_id": recordID, "source_id": sourceID, "source_name": sourceName, "category": category, "job_id": jobID, "snapshot_id": snapshotID, "canonical_url": canonical, "raw_sha256": rawHash, "content_sha256": contentHash, "title": title, "body_text": body, "language": lang, "published_at": published, "acquired_at": acquired, "created_at": created, "extractor_name": engine, "extractor_version": version, "quality_score": score, "record_kind": kind, "rights": rights}, nil
 }
 func (s *Store) JobEvents(ctx context.Context, id string) ([]map[string]any, error) {
 	rows, e := s.DB.Query(ctx, `SELECT event_type,details,event_time FROM job_events WHERE job_id=$1 ORDER BY event_id DESC LIMIT 100`, id)
@@ -839,4 +982,184 @@ func (s *Store) SourceHealth(ctx context.Context) ([]map[string]any, error) {
 			"terminal_success_ratio": rate, "last_completed_at": lastCompleted})
 	}
 	return out, rows.Err()
+}
+
+func categoryKey(name string) string {
+	ok := name != "" && len(name) <= 41
+	for i, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+		case r == '-' && i > 0:
+		default:
+			ok = false
+		}
+	}
+	if ok {
+		return name
+	}
+	sum := sha256.Sum256([]byte(name))
+	return "c-" + hex.EncodeToString(sum[:6])
+}
+
+func (s *Store) ListCategories(ctx context.Context) ([]core.Category, error) {
+	rows, err := s.DB.Query(ctx, `SELECT c.category_id, c.name, c.sort_order, count(s.source_id) FROM categories c LEFT JOIN sources s ON s.category_id=c.category_id GROUP BY c.category_id, c.name, c.sort_order ORDER BY c.sort_order, c.name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []core.Category{}
+	for rows.Next() {
+		var item core.Category
+		if err = rows.Scan(&item.ID, &item.Name, &item.SortOrder, &item.Sources); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) CreateCategory(ctx context.Context, name string) (core.Category, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || len([]rune(name)) > 40 {
+		return core.Category{}, errors.New("invalid category name")
+	}
+	item := core.Category{ID: categoryKey(name), Name: name, SortOrder: 100}
+	tag, err := s.DB.Exec(ctx, `INSERT INTO categories(category_id, name) VALUES($1,$2) ON CONFLICT DO NOTHING`, item.ID, item.Name)
+	if err != nil {
+		return core.Category{}, err
+	}
+	if tag.RowsAffected() == 0 {
+		return core.Category{}, errors.New("category already exists")
+	}
+	return item, nil
+}
+
+func (s *Store) RenameCategory(ctx context.Context, id, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" || len([]rune(name)) > 40 {
+		return errors.New("invalid category name")
+	}
+	tx, err := s.DB.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE categories SET name=$2 WHERE category_id=$1`, id, name)
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
+			return errors.New("category already exists")
+		}
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return pgx.ErrNoRows
+	}
+	if _, err = tx.Exec(ctx, `UPDATE sources SET category=$2, updated_at=now() WHERE category_id=$1`, id, name); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (s *Store) ReorderCategories(ctx context.Context, ids []string) error {
+	if len(ids) == 0 || len(ids) > 200 {
+		return errors.New("invalid category order")
+	}
+	seen := map[string]struct{}{}
+	for _, id := range ids {
+		if _, ok := seen[id]; ok || id == "" {
+			return errors.New("invalid category order")
+		}
+		seen[id] = struct{}{}
+	}
+	tx, err := s.DB.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `SELECT category_id FROM categories`)
+	if err != nil {
+		return err
+	}
+	existing := map[string]struct{}{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[id] = struct{}{}
+	}
+	rows.Close()
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	if len(existing) != len(ids) {
+		return errors.New("invalid category order")
+	}
+	for index, id := range ids {
+		if _, ok := existing[id]; !ok {
+			return errors.New("invalid category order")
+		}
+		tag, err := tx.Exec(ctx, `UPDATE categories SET sort_order=$2 WHERE category_id=$1`, id, (index+1)*10)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() != 1 {
+			return pgx.ErrNoRows
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+func (s *Store) DeleteCategory(ctx context.Context, id string, detach bool) error {
+	tx, err := s.DB.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var used int
+	if err = tx.QueryRow(ctx, `SELECT count(*) FROM sources WHERE category_id=$1`, id).Scan(&used); err != nil {
+		return err
+	}
+	if used > 0 && !detach {
+		return errors.New("category in use")
+	}
+	if used > 0 {
+		if _, err = tx.Exec(ctx, `UPDATE sources SET category_id=NULL, category='', updated_at=now() WHERE category_id=$1`, id); err != nil {
+			return err
+		}
+	}
+	tag, err := tx.Exec(ctx, `DELETE FROM categories WHERE category_id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return pgx.ErrNoRows
+	}
+	return tx.Commit(ctx)
+}
+
+func (s *Store) AssignCategory(ctx context.Context, sourceID, categoryID string) error {
+	if categoryID == "" {
+		tag, err := s.DB.Exec(ctx, `UPDATE sources SET category_id=NULL, category='', updated_at=now() WHERE source_id=$1`, sourceID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() != 1 {
+			return pgx.ErrNoRows
+		}
+		return nil
+	}
+	var name string
+	if err := s.DB.QueryRow(ctx, `SELECT name FROM categories WHERE category_id=$1`, categoryID).Scan(&name); err != nil {
+		return err
+	}
+	tag, err := s.DB.Exec(ctx, `UPDATE sources SET category_id=$2, category=$3, updated_at=now() WHERE source_id=$1`, sourceID, categoryID, name)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
